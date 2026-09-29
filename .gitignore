@@ -1,0 +1,18 @@
+﻿# Секреты
+.env
+
+# Логи
+agent_log.txt
+trades_log.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.vscode/
+.idea/
+
+# Временные файлы
+*.tmp
+*.bak
