@@ -267,7 +267,9 @@ else:
   "reason": "краткое обоснование на русском"
 }}
 """
-    
+    # Очистка промпта от проблемных символов
+    prompt = prompt.encode("utf-8", errors="ignore").decode("utf-8")
+
     client = OpenAI(api_key=PROXYAPI_KEY, base_url=PROXYAPI_BASE_URL)
     
     try:
@@ -295,6 +297,7 @@ else:
         signal = {"action": "HOLD", "confidence": 0.5, "reason": "Ошибка API"}
 
 log(f"СИГНАЛ: {signal['action']} | confidence={signal['confidence']} | {signal['reason']}")
+
 
 # ============================================================
 # ШАГ 4: Сделка с риск-менеджментом
