@@ -27,7 +27,7 @@ def run_agent():
     
     print(f"\n[{now_str}] Запуск агента...")
     result = subprocess.run(
-        ["py", "agent_v8.py"],
+        ["py", "agent_v9.py"],
         cwd="C:\\ai_trader",
         capture_output=True,
         text=True,
