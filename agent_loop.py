@@ -31,7 +31,7 @@ def run_agent():
         cwd="C:\\ai_trader",
         capture_output=True,
         text=True,
-        encoding="utf-8",
+        encoding="cp866",
         errors="replace"
     )
     if result.stdout:
