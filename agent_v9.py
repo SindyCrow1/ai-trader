@@ -1,12 +1,14 @@
 ﻿import os
 import json
+import time
 import feedparser
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from openai import OpenAI
 from t_tech.invest import Client, Quotation
 from t_tech.invest.schemas import OrderDirection, CandleInterval
-
+import sys
+sys.stdout.reconfigure(encoding='utf-8')
 load_dotenv()
 
 PROXYAPI_KEY = os.getenv("PROXYAPI_KEY")
@@ -26,16 +28,11 @@ STOCKS = [
         "name": "Сбербанк",
         "max_position": 5,
     },
-    {
-        "ticker": "GAZP",
-        "figi": "BBG004730RP0",
-        "name": "Газпром",
-        "max_position": 5,
-    },
+    
 ]
 
 # ============ РИСК-МЕНЕДЖМЕНТ (общий) ============
-MAX_TRADES_PER_DAY = 2
+MAX_TRADES_PER_DAY = 1
 STOP_LOSS_PERCENT = 5.0
 TRADE_START_HOUR = 9
 TRADE_END_HOUR = 23
@@ -51,8 +48,6 @@ KEYWORDS = {
     "SBER": ["сбер", "сбербанк", "банковск", "банк", "цб", "центробанк",
              "ключев", "ставк", "кредит", "ипотек", "вклад",
              "дивиденд", "прибыл", "убыток", "отчетност"],
-    "GAZP": ["газпром", "газ", "нефт", "энерг", "экспорт", "труб",
-             "опек", "месторожд", "дивидент", "прибыл", "убыток"],
 }
 
 def log(message):
@@ -128,13 +123,15 @@ def process_stock(client, stock, all_news):
     portfolio = client.sandbox.get_sandbox_portfolio(account_id=ACCOUNT_ID)
     position = 0
     avg_price = 0
-    for pos in portfolio.positions:
-        if pos.figi == figi:
-            position = int(pos.quantity.units)
-            if position > 0:
-                avg_price = (pos.average_position_price.units + 
-                             pos.average_position_price.nano / 1_000_000_000)
-            break
+    if portfolio.positions:
+        for pos in portfolio.positions:
+            if pos.figi == figi:
+                if pos.quantity and pos.quantity.units is not None:
+                    position = int(pos.quantity.units)
+                    if position > 0 and pos.average_position_price:
+                        avg_price = (pos.average_position_price.units + 
+                                     pos.average_position_price.nano / 1_000_000_000)
+                break
     
     log(f"Текущая позиция {ticker}: {position} акций")
     if position > 0:
@@ -326,6 +323,20 @@ def process_stock(client, stock, all_news):
                 direction=OrderDirection.ORDER_DIRECTION_BUY, order_type=1
             )
             log_trade(f"КУПЛЕНО 1 акция {ticker} по {price.units} руб., order_id={order.order_id}")
+            
+            # Ждём, пока песочница обновит позицию
+            time.sleep(5)
+            
+            # Перепроверяем позицию
+            portfolio_check = client.sandbox.get_sandbox_portfolio(account_id=ACCOUNT_ID)
+            new_position = 0
+            if portfolio_check.positions:
+                for pos in portfolio_check.positions:
+                    if pos.figi == figi:
+                        if pos.quantity and pos.quantity.units is not None:
+                            new_position = int(pos.quantity.units)
+                        break
+            log(f"Позиция {ticker} после покупки: {new_position} акций")
     
     elif signal['action'] == 'SELL' and signal['confidence'] >= 0.6:
         if not trading_allowed:
@@ -351,7 +362,7 @@ def process_stock(client, stock, all_news):
 # ГЛАВНЫЙ ЦИКЛ
 # ============================================================
 log("=" * 60)
-log("ЗАПУСК АГЕНТА v9 (SBER + GAZP)")
+log("ЗАПУСК АГЕНТА v9 (SBER)")
 log("=" * 60)
 
 # Собираем новости один раз для всех акций
@@ -374,9 +385,6 @@ log(f"Всего новостей: {len(all_news)}")
 # Обрабатываем каждую акцию
 with Client(INVEST_TOKEN) as client:
     for stock in STOCKS:
-        try:
-            process_stock(client, stock, all_news)
-        except Exception as e:
-            log(f"Ошибка обработки {stock['ticker']}: {e}")
+        process_stock(client, stock, all_news)
 
 log("Агент завершил работу")
